@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+*.egg-info/
+dist/
+.ruff_cache/
+.pytest_cache/
+.mypy_cache/
+
+# Environment
+.env
+.env.local
+
+# Session & auth (never commit)
+session/auth.json
+session/*.json
+
+# Playwright artifacts
+data/logs/playwright/
+test-results/
+playwright-report/
+
+# Node
+node_modules/
+
+# macOS
+.DS_Store
+
+# Editor
+.idea/
+*.swp
