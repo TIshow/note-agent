@@ -1,9 +1,8 @@
 """Tests for src/models.py"""
+
 from __future__ import annotations
 
 from pathlib import Path
-
-import pytest
 
 from src.models import ArticleDraft, DraftStatus, InputDocument
 

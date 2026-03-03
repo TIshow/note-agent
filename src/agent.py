@@ -1,4 +1,5 @@
 """Orchestration loop: read inbox → generate → save draft → move to processed."""
+
 from __future__ import annotations
 
 import logging
@@ -54,6 +55,7 @@ class Agent:
         dry_run: bool = False,
         save_to_note: bool = False,
         style: WritingStyle = WritingStyle.general,
+        headless: bool = True,
     ) -> list[ArticleDraft]:
         """Process all inbox files. Returns list of drafts."""
         docs = _load_inbox(self._settings.inbox_dir, style)
@@ -76,16 +78,19 @@ class Agent:
 
         if save_to_note:
             import asyncio
+
             session = Path("session/auth.json")
             if not session.exists():
                 logger.warning("session/auth.json not found — skipping note.com upload")
             else:
-                asyncio.run(self._upload_drafts(drafts, session))
+                asyncio.run(self._upload_drafts(drafts, session, headless=headless))
 
         return drafts
 
-    async def _upload_drafts(self, drafts: list[ArticleDraft], session: Path) -> None:
-        async with NoteClient(session_path=session) as client:
+    async def _upload_drafts(
+        self, drafts: list[ArticleDraft], session: Path, *, headless: bool = True
+    ) -> None:
+        async with NoteClient(session_path=session, headless=headless) as client:
             for draft in drafts:
                 if draft.status == DraftStatus.generated:
                     await client.save_draft(draft)

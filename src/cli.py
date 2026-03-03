@@ -1,4 +1,5 @@
 """Command-line entry point."""
+
 from __future__ import annotations
 
 import argparse
@@ -48,6 +49,11 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
     )
+    parser.add_argument(
+        "--no-headless",
+        action="store_true",
+        help="Show browser window during note.com automation (useful for debugging)",
+    )
 
     args = parser.parse_args(argv)
 
@@ -59,6 +65,7 @@ def main(argv: list[str] | None = None) -> int:
         dry_run=args.dry_run,
         save_to_note=args.save_to_note,
         style=WritingStyle(args.style),
+        headless=not args.no_headless,
     )
 
     print(f"Done. {len(drafts)} draft(s) generated.")

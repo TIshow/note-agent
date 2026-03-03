@@ -1,8 +1,10 @@
 """note.com browser automation — draft creation only. Never publishes."""
+
 from __future__ import annotations
 
 import asyncio
 import logging
+from datetime import datetime
 from pathlib import Path
 
 from playwright.async_api import BrowserContext, Page, async_playwright
@@ -13,8 +15,8 @@ logger = logging.getLogger(__name__)
 
 # note.com Markdown features not supported in the editor paste flow
 _UNSUPPORTED_MD = [
-    r"```",     # code blocks
-    r"<.*?>",   # raw HTML
+    r"```",  # code blocks
+    r"<.*?>",  # raw HTML
 ]
 
 NOTE_EDITOR_URL = "https://note.com/notes/new"
@@ -36,12 +38,13 @@ class NoteClient:
         self._browser = None
         self._context: BrowserContext | None = None
 
-    async def __aenter__(self) -> "NoteClient":
+    async def __aenter__(self) -> NoteClient:
         self._playwright = await async_playwright().start()
         self._browser = await self._playwright.chromium.launch(headless=self._headless)
         self._context = await self._browser.new_context(
             storage_state=str(self._session_path),
             locale="ja-JP",
+            permissions=["clipboard-read", "clipboard-write"],
         )
         return self
 
@@ -61,13 +64,16 @@ class NoteClient:
         page: Page = await self._context.new_page()
         try:
             await page.goto(NOTE_EDITOR_URL)
-            await asyncio.sleep(2)
+            title_input = page.get_by_placeholder("記事タイトル")
+            await title_input.wait_for(state="visible")
 
-            await page.get_by_label("タイトル").fill(draft.title)
+            await title_input.fill(draft.title)
             await asyncio.sleep(1)
 
-            body_area = page.get_by_role("textbox", name="本文")
-            await body_area.fill(draft.body)
+            body_area = page.locator(".ProseMirror")
+            await body_area.click()
+            await page.evaluate("(text) => navigator.clipboard.writeText(text)", draft.body)
+            await page.keyboard.press("Meta+v")
             await asyncio.sleep(1)
 
             await page.get_by_role("button", name=DRAFT_SAVE_LABEL).click()
@@ -75,7 +81,9 @@ class NoteClient:
 
             draft_url = page.url
             if "/drafts/" not in draft_url and "/notes/edit/" not in draft_url:
-                logger.warning("Unexpected URL after save: %s — draft may not have saved", draft_url)
+                logger.warning(
+                    "Unexpected URL after save: %s — draft may not have saved", draft_url
+                )
 
             draft.draft_url = draft_url
             draft.status = DraftStatus.saved
@@ -84,6 +92,11 @@ class NoteClient:
         except Exception as e:
             draft.status = DraftStatus.failed
             logger.error("Failed to save draft '%s': %s", draft.title, e)
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            screenshot_path = Path("data/logs") / f"debug_{ts}.png"
+            screenshot_path.parent.mkdir(parents=True, exist_ok=True)
+            await page.screenshot(path=str(screenshot_path))
+            logger.info("Screenshot saved to %s", screenshot_path)
             raise
         finally:
             await page.close()

@@ -1,4 +1,5 @@
 """Tests for src/article_generator.py — mocks Anthropic API."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -64,4 +65,6 @@ def test_generate_quantamental_style(tmp_path: Path) -> None:
     assert draft.status == DraftStatus.generated
     # Verify the quantamental prompt was used (system prompt differs by style)
     call_kwargs = mock_client.messages.create.call_args.kwargs
-    assert "quantamental" in call_kwargs.get("system", "").lower() or True  # prompt loaded from file
+    assert (
+        "quantamental" in call_kwargs.get("system", "").lower() or True
+    )  # prompt loaded from file

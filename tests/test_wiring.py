@@ -1,4 +1,5 @@
 """Smoke tests — verifies the project structure is importable and wired correctly."""
+
 from __future__ import annotations
 
 

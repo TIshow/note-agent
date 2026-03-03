@@ -1,4 +1,5 @@
 """Settings loaded from environment variables. No side effects at import time."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -8,7 +9,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     anthropic_api_key: str = Field(..., alias="ANTHROPIC_API_KEY")
     note_user_id: str = Field("", alias="NOTE_USER_ID")

@@ -1,25 +1,26 @@
 """Data models. No I/O here — pure pydantic structures."""
+
 from __future__ import annotations
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 
 from pydantic import BaseModel, Field
 
 
-class DraftStatus(str, Enum):
+class DraftStatus(StrEnum):
     pending = "pending"
     generated = "generated"
     saved = "saved"
     failed = "failed"
 
 
-class WritingStyle(str, Enum):
+class WritingStyle(StrEnum):
     """Controls which prompt template and writing voice is used."""
 
-    general = "general"           # General-audience note.com article
-    quantamental = "quantamental" # Investor + quantamental analyst perspective
+    general = "general"  # General-audience note.com article
+    quantamental = "quantamental"  # Investor + quantamental analyst perspective
 
 
 class InputDocument(BaseModel):

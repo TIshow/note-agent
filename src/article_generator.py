@@ -1,4 +1,5 @@
 """LLM-based article generator. Calls Anthropic API, returns ArticleDraft."""
+
 from __future__ import annotations
 
 import logging
@@ -28,12 +29,12 @@ def _load_system_prompt(style: WritingStyle) -> str:
 def _parse_response(text: str, source_path: Path, style: WritingStyle) -> ArticleDraft:
     """Parse LLM output into an ArticleDraft. Raises ValueError on bad format."""
     lines = text.strip().splitlines()
-    title_line = next((l for l in lines if l.startswith("TITLE:")), None)
+    title_line = next((line for line in lines if line.startswith("TITLE:")), None)
     if not title_line:
         raise ValueError("LLM response missing TITLE: line")
 
     title = title_line.removeprefix("TITLE:").strip()
-    sep_idx = next((i for i, l in enumerate(lines) if l.strip() == "---"), None)
+    sep_idx = next((i for i, line in enumerate(lines) if line.strip() == "---"), None)
     body = "\n".join(lines[sep_idx + 1 :]).strip() if sep_idx is not None else ""
 
     return ArticleDraft(title=title, body=body, source_path=source_path, style=style)
