@@ -18,6 +18,10 @@ _STYLE_PROMPT_FILES: dict[WritingStyle, str] = {
     WritingStyle.quantamental: "style_quantamental.txt",
 }
 
+# max_uses controls cost vs. quality trade-off (each search ≈ $0.01 + page tokens):
+#   3 — cheapest, sufficient for simple topics
+#   5 — balanced (current)
+#  10 — deeper research, higher cost
 _WEB_SEARCH_TOOL: list[dict] = [{"type": "web_search_20260209", "name": "web_search", "max_uses": 5}]
 
 
