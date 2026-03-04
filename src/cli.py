@@ -54,13 +54,18 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Show browser window during note.com automation (useful for debugging)",
     )
+    parser.add_argument(
+        "--no-web-search",
+        action="store_true",
+        help="Disable web search enrichment during article generation",
+    )
 
     args = parser.parse_args(argv)
 
     settings = get_settings()
     _setup_logging(args.log_level or settings.log_level)
 
-    agent = Agent(settings)
+    agent = Agent(settings, web_search=not args.no_web_search)
     drafts = agent.run(
         dry_run=args.dry_run,
         save_to_note=args.save_to_note,

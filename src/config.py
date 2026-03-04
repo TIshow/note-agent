@@ -13,6 +13,8 @@ class Settings(BaseSettings):
 
     anthropic_api_key: str = Field(..., alias="ANTHROPIC_API_KEY")
     note_user_id: str = Field("", alias="NOTE_USER_ID")
+    note_user_email: str = Field("", alias="NOTE_USER_EMAIL")
+    note_user_password: str = Field("", alias="NOTE_USER_PASSWORD")
 
     log_level: str = Field("INFO", alias="LOG_LEVEL")
 

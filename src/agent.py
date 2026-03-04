@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import shutil
 from pathlib import Path
@@ -43,10 +44,19 @@ def _move_to_processed(doc: InputDocument, processed_dir: Path) -> None:
 class Agent:
     """Runs the full pipeline for all files in the inbox."""
 
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: Settings, web_search: bool = True) -> None:
         self._settings = settings
         self._generator = ArticleGenerator(
-            client=anthropic.Anthropic(api_key=settings.anthropic_api_key)
+            client=anthropic.Anthropic(api_key=settings.anthropic_api_key),
+            web_search=web_search,
+        )
+
+    def _make_note_client(self, headless: bool) -> NoteClient:
+        return NoteClient(
+            session_path=Path("session/auth.json"),
+            headless=headless,
+            email=self._settings.note_user_email,
+            password=self._settings.note_user_password,
         )
 
     def run(
@@ -57,12 +67,21 @@ class Agent:
         style: WritingStyle = WritingStyle.general,
         headless: bool = True,
     ) -> list[ArticleDraft]:
-        """Process all inbox files. Returns list of drafts."""
+        """Process all inbox files. Returns list of drafts.
+
+        When save_to_note=True, note.com login is verified BEFORE article
+        generation so no API credits are spent if the session cannot be established.
+        """
         docs = _load_inbox(self._settings.inbox_dir, style)
         if not docs:
             logger.info("Inbox is empty — nothing to process")
             return []
 
+        # ── Step 1: verify / establish note.com session before spending API credits ──
+        if save_to_note and not dry_run:
+            asyncio.run(self._ensure_note_session(headless=headless))
+
+        # ── Step 2: generate articles ──
         drafts: list[ArticleDraft] = []
         for doc in docs:
             try:
@@ -76,21 +95,24 @@ class Agent:
             except Exception as e:
                 logger.error("Failed on %s: %s", doc.path.name, e)
 
-        if save_to_note:
-            import asyncio
-
-            session = Path("session/auth.json")
-            if not session.exists():
-                logger.warning("session/auth.json not found — skipping note.com upload")
-            else:
-                asyncio.run(self._upload_drafts(drafts, session, headless=headless))
+        # ── Step 3: upload to note.com ──
+        if save_to_note and not dry_run:
+            asyncio.run(self._upload_drafts(drafts, headless=headless))
 
         return drafts
 
-    async def _upload_drafts(
-        self, drafts: list[ArticleDraft], session: Path, *, headless: bool = True
-    ) -> None:
-        async with NoteClient(session_path=session, headless=headless) as client:
+    async def _ensure_note_session(self, *, headless: bool) -> None:
+        """Navigate to the note.com editor to verify login. Auto-login if needed.
+
+        Raises on failure so the pipeline aborts before generating articles.
+        """
+        logger.info("Verifying note.com session before article generation...")
+        async with self._make_note_client(headless) as client:
+            await client.ensure_logged_in()
+        logger.info("note.com session OK")
+
+    async def _upload_drafts(self, drafts: list[ArticleDraft], *, headless: bool) -> None:
+        async with self._make_note_client(headless) as client:
             for draft in drafts:
                 if draft.status == DraftStatus.generated:
                     await client.save_draft(draft)

@@ -20,7 +20,11 @@ _UNSUPPORTED_MD = [
 ]
 
 NOTE_EDITOR_URL = "https://note.com/notes/new"
+NOTE_LOGIN_URL = "https://note.com/login"
 DRAFT_SAVE_LABEL = "下書き保存"  # "Save as draft" button text
+
+# Timeout for waiting for the editor to appear after navigation (ms)
+_EDITOR_LOAD_TIMEOUT = 15_000
 
 
 class NoteClient:
@@ -31,9 +35,17 @@ class NoteClient:
             draft = await client.save_draft(article)
     """
 
-    def __init__(self, session_path: Path, headless: bool = True) -> None:
+    def __init__(
+        self,
+        session_path: Path,
+        headless: bool = True,
+        email: str = "",
+        password: str = "",
+    ) -> None:
         self._session_path = session_path
         self._headless = headless
+        self._email = email
+        self._password = password
         self._playwright = None
         self._browser = None
         self._context: BrowserContext | None = None
@@ -42,7 +54,7 @@ class NoteClient:
         self._playwright = await async_playwright().start()
         self._browser = await self._playwright.chromium.launch(headless=self._headless)
         self._context = await self._browser.new_context(
-            storage_state=str(self._session_path),
+            storage_state=str(self._session_path) if self._session_path.exists() else None,
             locale="ja-JP",
             permissions=["clipboard-read", "clipboard-write"],
         )
@@ -56,6 +68,58 @@ class NoteClient:
         if self._playwright:
             await self._playwright.stop()
 
+    async def ensure_logged_in(self) -> None:
+        """Verify session by navigating to the editor. Auto-login if needed.
+
+        Called once before article generation so we fail fast if login is broken.
+        """
+        if not self._context:
+            raise RuntimeError("NoteClient must be used as async context manager")
+        page: Page = await self._context.new_page()
+        try:
+            await page.goto(NOTE_EDITOR_URL, wait_until="domcontentloaded")
+            if not await self._is_logged_in(page):
+                await self._login(page)
+                await page.goto(NOTE_EDITOR_URL, wait_until="domcontentloaded")
+                await page.get_by_placeholder("記事タイトル").wait_for(
+                    state="visible", timeout=30_000
+                )
+        finally:
+            await page.close()
+
+    async def _is_logged_in(self, page: Page) -> bool:
+        """Return True if the editor title input is visible within a short timeout."""
+        try:
+            await page.get_by_placeholder("記事タイトル").wait_for(
+                state="visible", timeout=_EDITOR_LOAD_TIMEOUT
+            )
+            return True
+        except Exception:
+            return False
+
+    async def _login(self, page: Page) -> None:
+        """Log in using email/password and persist the new session to disk."""
+        if not self._email or not self._password:
+            raise RuntimeError(
+                "Session expired and no credentials available. "
+                "Set NOTE_USER_EMAIL and NOTE_USER_PASSWORD in .env, "
+                "or refresh session/auth.json manually."
+            )
+        logger.info("Session expired — logging in automatically")
+        await page.goto(NOTE_LOGIN_URL, wait_until="domcontentloaded")
+        await asyncio.sleep(2)
+
+        await page.get_by_placeholder("メールアドレス").fill(self._email)
+        await page.get_by_placeholder("パスワード").fill(self._password)
+        await page.get_by_role("button", name="ログイン").click()
+        await page.wait_for_url("https://note.com/**", timeout=30_000)
+        await asyncio.sleep(2)
+
+        # Persist refreshed session
+        assert self._context is not None
+        await self._context.storage_state(path=str(self._session_path))
+        logger.info("Session refreshed and saved to %s", self._session_path)
+
     async def save_draft(self, draft: ArticleDraft) -> ArticleDraft:
         """Fill editor and save as draft. Returns draft with updated status and URL."""
         if not self._context:
@@ -63,11 +127,16 @@ class NoteClient:
 
         page: Page = await self._context.new_page()
         try:
-            await page.goto(NOTE_EDITOR_URL)
-            title_input = page.get_by_placeholder("記事タイトル")
-            await title_input.wait_for(state="visible")
+            await page.goto(NOTE_EDITOR_URL, wait_until="domcontentloaded")
 
-            await title_input.fill(draft.title)
+            if not await self._is_logged_in(page):
+                await self._login(page)
+                await page.goto(NOTE_EDITOR_URL, wait_until="domcontentloaded")
+                await page.get_by_placeholder("記事タイトル").wait_for(
+                    state="visible", timeout=30_000
+                )
+
+            await page.get_by_placeholder("記事タイトル").fill(draft.title)
             await asyncio.sleep(1)
 
             body_area = page.locator(".ProseMirror")
@@ -80,7 +149,7 @@ class NoteClient:
             await asyncio.sleep(2)
 
             draft_url = page.url
-            if "/drafts/" not in draft_url and "/notes/edit/" not in draft_url:
+            if "/notes/" not in draft_url:
                 logger.warning(
                     "Unexpected URL after save: %s — draft may not have saved", draft_url
                 )
