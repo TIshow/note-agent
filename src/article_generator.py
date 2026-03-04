@@ -18,7 +18,7 @@ _STYLE_PROMPT_FILES: dict[WritingStyle, str] = {
     WritingStyle.quantamental: "style_quantamental.txt",
 }
 
-_WEB_SEARCH_TOOL: list[dict] = [{"type": "web_search_20250305", "name": "web_search"}]
+_WEB_SEARCH_TOOL: list[dict] = [{"type": "web_search_20260209", "name": "web_search"}]
 
 
 def _load_system_prompt(style: WritingStyle) -> str:
@@ -81,13 +81,8 @@ class ArticleGenerator:
                 "messages": [{"role": "user", "content": doc.content}],
             }
             if self._web_search:
-                message = self._client.beta.messages.create(
-                    **common,
-                    tools=_WEB_SEARCH_TOOL,
-                    betas=["web-search-2025-03-05"],
-                )
-            else:
-                message = self._client.messages.create(**common)
+                common["tools"] = _WEB_SEARCH_TOOL
+            message = self._client.messages.create(**common)
 
             raw = _extract_text(message)
             draft = _parse_response(raw, doc.path, doc.style)

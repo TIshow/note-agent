@@ -82,9 +82,9 @@ def test_generate_no_web_search(tmp_path: Path) -> None:
 
 
 def test_generate_with_web_search(tmp_path: Path) -> None:
-    """web_search=True uses client.beta.messages.create."""
+    """web_search=True passes tools= to client.messages.create."""
     mock_client = MagicMock()
-    mock_client.beta.messages.create.return_value = MagicMock(
+    mock_client.messages.create.return_value = MagicMock(
         content=[_text_block("TITLE: 銘柄分析\n---\n## テーゼ\n割安だ。")]
     )
 
@@ -98,8 +98,9 @@ def test_generate_with_web_search(tmp_path: Path) -> None:
 
     assert draft.style == WritingStyle.quantamental
     assert draft.status == DraftStatus.generated
-    mock_client.beta.messages.create.assert_called_once()
-    mock_client.messages.create.assert_not_called()
+    call_kwargs = mock_client.messages.create.call_args.kwargs
+    assert "tools" in call_kwargs
+    assert call_kwargs["tools"][0]["type"] == "web_search_20260209"
 
 
 def test_generate_quantamental_style(tmp_path: Path) -> None:
