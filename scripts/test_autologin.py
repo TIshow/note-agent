@@ -52,29 +52,7 @@ async def main() -> None:
         email=settings.note_user_email,
         password=settings.note_user_password,
     ) as client:
-        # Run ensure_logged_in and dump editor page state on failure
-        from playwright.async_api import async_playwright as _ap  # noqa: F401
-        assert client._context is not None
-        page = await client._context.new_page()
-        try:
-            await client._navigate_to_editor(page)
-            logger.info("Editor loaded successfully")
-        except Exception as e:
-            logger.error("Failed to reach editor: %s", e)
-            screenshot = Path("data/logs/debug_after_login.png")
-            screenshot.parent.mkdir(parents=True, exist_ok=True)
-            await page.screenshot(path=str(screenshot))
-            logger.info("Screenshot: %s", screenshot)
-            for tag in ("textarea", "input"):
-                els = await page.query_selector_all(tag)
-                logger.info("<%s> elements (%d):", tag, len(els))
-                for el in els:
-                    ph = await el.get_attribute("placeholder")
-                    cls = await el.get_attribute("class")
-                    logger.info("  placeholder=%r  class=%r", ph, str(cls)[:60])
-            raise
-        finally:
-            await page.close()
+        await client.ensure_logged_in()
 
     if _TEST_SESSION.exists():
         logger.info("Session saved to %s — auto-login succeeded!", _TEST_SESSION)
