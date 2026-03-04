@@ -8,6 +8,7 @@ from datetime import datetime
 from pathlib import Path
 
 from playwright.async_api import BrowserContext, Page, async_playwright
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
 from .models import ArticleDraft, DraftStatus
 
@@ -96,7 +97,7 @@ class NoteClient:
                 state="visible", timeout=_EDITOR_LOAD_TIMEOUT
             )
             return True
-        except TimeoutError:
+        except PlaywrightTimeoutError:
             return False
         except Exception:
             logger.warning("Unexpected error while checking login state", exc_info=True)
@@ -111,13 +112,18 @@ class NoteClient:
                 "or refresh session/auth.json manually."
             )
         logger.info("Session expired — logging in automatically")
-        await page.goto(NOTE_LOGIN_URL, wait_until="domcontentloaded")
-        await asyncio.sleep(2)
+        await page.goto(NOTE_LOGIN_URL, wait_until="networkidle")
 
-        await page.get_by_placeholder("メールアドレス").fill(self._email)
-        await page.get_by_placeholder("パスワード").fill(self._password)
+        # note.com login form selectors (confirmed 2026-03):
+        # email input has no type attr; password is type='password'
+        email_input = page.locator("input:not([type='password'])")
+        await email_input.wait_for(state="visible", timeout=15_000)
+        await email_input.fill(self._email)
+        await page.locator("input[type='password']").fill(self._password)
         await page.get_by_role("button", name="ログイン").click()
-        await page.wait_for_url("https://note.com/**", timeout=30_000)
+        # Wait until we navigate away from the login page.
+        # "https://note.com/**" also matches /login itself, so we use a predicate.
+        await page.wait_for_url(lambda url: "/login" not in url, timeout=30_000)
 
         # Persist refreshed session
         assert self._context is not None
