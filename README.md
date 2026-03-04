@@ -17,9 +17,9 @@ Automatically generate **note.com article drafts** from text files or transcript
 
 ### Writing styles
 
-| Style | Description |
-|---|---|
-| `general` | General-audience note.com article (default) |
+| Style          | Description                                                                                 |
+| -------------- | ------------------------------------------------------------------------------------------- |
+| `general`      | General-audience note.com article (default)                                                 |
 | `quantamental` | Investor + quantamental analyst perspective — combines quant data with fundamental judgment |
 
 ---
@@ -73,7 +73,7 @@ uv run note-agent --style quantamental --dry-run
 uv run note-agent
 
 # Generate and upload to note.com as drafts (requires session/auth.json)
-uv run note-agent --save-to-note --style quantamental
+uv run note-agent --save-to-note --style quantamental --no-headless
 ```
 
 ### Setting up note.com session
