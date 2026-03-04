@@ -77,15 +77,17 @@ class NoteClient:
             raise RuntimeError("NoteClient must be used as async context manager")
         page: Page = await self._context.new_page()
         try:
-            await page.goto(NOTE_EDITOR_URL, wait_until="domcontentloaded")
-            if not await self._is_logged_in(page):
-                await self._login(page)
-                await page.goto(NOTE_EDITOR_URL, wait_until="domcontentloaded")
-                await page.get_by_placeholder("記事タイトル").wait_for(
-                    state="visible", timeout=30_000
-                )
+            await self._navigate_to_editor(page)
         finally:
             await page.close()
+
+    async def _navigate_to_editor(self, page: Page) -> None:
+        """Go to editor URL, auto-login if session expired, then wait for title input."""
+        await page.goto(NOTE_EDITOR_URL, wait_until="domcontentloaded")
+        if not await self._is_logged_in(page):
+            await self._login(page)
+            await page.goto(NOTE_EDITOR_URL, wait_until="domcontentloaded")
+            await page.get_by_placeholder("記事タイトル").wait_for(state="visible", timeout=30_000)
 
     async def _is_logged_in(self, page: Page) -> bool:
         """Return True if the editor title input is visible within a short timeout."""
@@ -94,7 +96,10 @@ class NoteClient:
                 state="visible", timeout=_EDITOR_LOAD_TIMEOUT
             )
             return True
+        except TimeoutError:
+            return False
         except Exception:
+            logger.warning("Unexpected error while checking login state", exc_info=True)
             return False
 
     async def _login(self, page: Page) -> None:
@@ -113,7 +118,6 @@ class NoteClient:
         await page.get_by_placeholder("パスワード").fill(self._password)
         await page.get_by_role("button", name="ログイン").click()
         await page.wait_for_url("https://note.com/**", timeout=30_000)
-        await asyncio.sleep(2)
 
         # Persist refreshed session
         assert self._context is not None
@@ -127,14 +131,7 @@ class NoteClient:
 
         page: Page = await self._context.new_page()
         try:
-            await page.goto(NOTE_EDITOR_URL, wait_until="domcontentloaded")
-
-            if not await self._is_logged_in(page):
-                await self._login(page)
-                await page.goto(NOTE_EDITOR_URL, wait_until="domcontentloaded")
-                await page.get_by_placeholder("記事タイトル").wait_for(
-                    state="visible", timeout=30_000
-                )
+            await self._navigate_to_editor(page)
 
             await page.get_by_placeholder("記事タイトル").fill(draft.title)
             await asyncio.sleep(1)

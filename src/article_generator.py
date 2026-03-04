@@ -74,20 +74,20 @@ class ArticleGenerator:
         )
         system_prompt = _load_system_prompt(doc.style)
         try:
-            kwargs: dict = dict(
-                model=self._model,
-                max_tokens=8192,
-                system=system_prompt,
-                messages=[{"role": "user", "content": doc.content}],
-            )
+            common = {
+                "model": self._model,
+                "max_tokens": 8192,
+                "system": system_prompt,
+                "messages": [{"role": "user", "content": doc.content}],
+            }
             if self._web_search:
                 message = self._client.beta.messages.create(
-                    **kwargs,
+                    **common,
                     tools=_WEB_SEARCH_TOOL,
                     betas=["web-search-2025-03-05"],
                 )
             else:
-                message = self._client.messages.create(**kwargs)
+                message = self._client.messages.create(**common)
 
             raw = _extract_text(message)
             draft = _parse_response(raw, doc.path, doc.style)
