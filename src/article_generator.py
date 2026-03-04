@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime
 import logging
 from pathlib import Path
 
@@ -76,7 +77,8 @@ class ArticleGenerator:
             doc.style.value,
             self._web_search,
         )
-        system_prompt = _load_system_prompt(doc.style)
+        today = datetime.date.today().strftime("%Y年%m月%d日")
+        system_prompt = f"今日の日付：{today}\n\n" + _load_system_prompt(doc.style)
         try:
             common = {
                 "model": self._model,
