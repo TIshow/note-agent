@@ -18,7 +18,7 @@ _STYLE_PROMPT_FILES: dict[WritingStyle, str] = {
     WritingStyle.quantamental: "style_quantamental.txt",
 }
 
-_WEB_SEARCH_TOOL: list[dict] = [{"type": "web_search_20260209", "name": "web_search"}]
+_WEB_SEARCH_TOOL: list[dict] = [{"type": "web_search_20260209", "name": "web_search", "max_uses": 5}]
 
 
 def _load_system_prompt(style: WritingStyle) -> str:
