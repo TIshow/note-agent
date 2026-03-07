@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -18,7 +19,18 @@ logger = logging.getLogger(__name__)
 _UNSUPPORTED_MD = [
     r"```",  # code blocks
     r"<.*?>",  # raw HTML
+    r"\|.*\|",  # Markdown tables (pipe-delimited rows)
 ]
+
+def _strip_unsupported(text: str) -> str:
+    """Remove Markdown syntax unsupported by note.com's editor."""
+    lines = []
+    for line in text.splitlines():
+        if any(re.search(pat, line) for pat in _UNSUPPORTED_MD):
+            continue
+        lines.append(line)
+    return "\n".join(lines)
+
 
 NOTE_EDITOR_URL = "https://note.com/notes/new"
 NOTE_LOGIN_URL = "https://note.com/login"
@@ -144,7 +156,8 @@ class NoteClient:
 
             body_area = page.locator(".ProseMirror")
             await body_area.click()
-            await page.evaluate("(text) => navigator.clipboard.writeText(text)", draft.body)
+            body = _strip_unsupported(draft.body)
+            await page.evaluate("(text) => navigator.clipboard.writeText(text)", body)
             await page.keyboard.press("Meta+v")
             await asyncio.sleep(1)
 
